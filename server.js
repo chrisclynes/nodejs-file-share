@@ -9,6 +9,9 @@ const File = require("./models/File")
 const express = require("express")
 const app = express()
 
+//allows express to understatnd form from html form tag
+app.use(express.urlencoded({ extended: true}))
+
 //set upload file path with multer
 //when called, this will create a folder in root called upload with the file
 //file will have a random generated name, no file name conflicts
@@ -29,13 +32,13 @@ app.get("/", (req, res) => {
 //on submit, before the request have multer stage the file for upload, takes file from form submit
 //the upload.single gives you file with properties, body gives you inputs from form.
 //the bcrypt.hash 10 is the password salt, ensures even same passwords are hashed differently
-app.post("/upload", upload.single("file"), async(req, res) => {
-    const fileData ={
+app.post("/upload", upload.single("file"), async (req, res) => {
+    const fileData = {
         path: req.file.path,
         originalName: req.file.originalname,
     }
-    if (req.body.password) {
-        fileData.password = await bcrypt.hash(req.body.paassword, 10)
+    if (req.body.password != null && req.body.password !== "") {
+        fileData.password = await bcrypt.hash(req.body.password, 10)
     }
 
     const file = await File.create(fileData)
@@ -44,15 +47,27 @@ app.post("/upload", upload.single("file"), async(req, res) => {
     res.render("index", { fileLink: `${req.headers.origin}/file/${file.id}`})
 })
 
-app.get("/file/:id", async(req, res) => {
-    res.send(req.params.id)
-    const file = await File.findById(red.params.id)
+app.route("/file/:id").get(handleDownload).post(handleDownload)
+
+async function handleDownload(req, res) {
+    const file = await File.findById(req.params.id)
+
+    if(file.password != null) {
+        if (req.body.password == null) {
+            res.render("password")
+            return
+        }
+        if (!(await bcrypt.compare(req.body.password, file.password))){
+            res.render("password", { error: true })
+            return
+        }
+    }
 
     file.downloadCount++
     await file.save()
 
     res.download(file.path, file.originalName)
-})
+}
 
 //listen on port
 app.listen(process.env.PORT)
