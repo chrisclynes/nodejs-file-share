@@ -39,7 +39,19 @@ app.post("/upload", upload.single("file"), async(req, res) => {
     }
 
     const file = await File.create(fileData)
-    res.send(file.originalName)
+    
+    //creates new url link from this file id from our domain(headers.origin)
+    res.render("index", { fileLink: `${req.headers.origin}/file/${file.id}`})
+})
+
+app.get("/file/:id", async(req, res) => {
+    res.send(req.params.id)
+    const file = await File.findById(red.params.id)
+
+    file.downloadCount++
+    await file.save()
+
+    res.download(file.path, file.originalName)
 })
 
 //listen on port
